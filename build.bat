@@ -16,7 +16,8 @@ echo Building application...
 echo.
 
 REM Build the application
-pyinstaller --onedir --windowed --name TopicManager topic_manager.py
+REM pyinstaller --onedir --windowed --name TopicManager topic_manager.py
+pyinstaller --onedir --windowed --name TopicManager --icon=app_icon.ico topic_manager.py
 
 if errorlevel 1 (
     echo.
