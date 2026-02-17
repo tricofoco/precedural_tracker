@@ -241,7 +241,7 @@ class RichTextEditor(tk.Frame):
 class TopicManagerApp:
     def __init__(self, root, db_path):
         self.root = root
-        self.root.title("Topic Manager")
+        self.root.title("Procedural Tracker")
         self.root.geometry("1000x700")
         
         self.db_path = db_path
@@ -416,6 +416,9 @@ class TopicManagerApp:
         self.body_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         body_scrollbar.config(command=self.body_text.yview)
         
+        # Configure highlight tag for search results
+        self.body_text.tag_configure("search_highlight", background="yellow", foreground="black")
+        
         # Images section
         images_label_frame = tk.Frame(right_frame)
         images_label_frame.pack(fill=tk.X, padx=10, pady=(10, 0))
@@ -469,6 +472,10 @@ class TopicManagerApp:
         """Filter topics based on search term"""
         search_term = self.search_var.get()
         self.refresh_topic_list(search_term)
+        
+        # If a topic is currently selected, refresh its highlighting
+        if self.current_topic_id:
+            self.refresh_current_topic_highlighting()
     
     def on_topic_select(self, event):
         """Handle topic selection"""
@@ -547,12 +554,66 @@ class TopicManagerApp:
             except (json.JSONDecodeError, KeyError, ValueError, IndexError):
                 pass
         
+        # Highlight search terms if there's an active search
+        self.highlight_search_terms()
+        
         self.body_text.config(state=tk.DISABLED)
         
         # Load images
         self.load_images(topic_id)
         
         conn.close()
+    
+    def highlight_search_terms(self):
+        """Highlight search terms in the body text"""
+        # Remove previous highlights
+        self.body_text.tag_remove("search_highlight", "1.0", tk.END)
+        
+        search_term = self.search_var.get().strip()
+        if not search_term:
+            return
+        
+        # Search for all occurrences of the search term (case-insensitive)
+        start_pos = "1.0"
+        search_term_lower = search_term.lower()
+        
+        while True:
+            # Find next occurrence
+            start_pos = self.body_text.search(search_term_lower, start_pos, 
+                                              stopindex=tk.END, nocase=True)
+            if not start_pos:
+                break
+            
+            # Calculate end position
+            end_pos = f"{start_pos}+{len(search_term)}c"
+            
+            # Add highlight tag
+            self.body_text.tag_add("search_highlight", start_pos, end_pos)
+            
+            # Raise the highlight tag to be visible above other formatting
+            self.body_text.tag_raise("search_highlight")
+            
+            # Move to next character for next search
+            start_pos = end_pos
+        
+        # If we found highlights, scroll to the first one
+        if self.body_text.tag_ranges("search_highlight"):
+            first_highlight = self.body_text.tag_ranges("search_highlight")[0]
+            self.body_text.see(first_highlight)
+    
+    def refresh_current_topic_highlighting(self):
+        """Refresh highlighting in the currently displayed topic without reloading"""
+        if not self.current_topic_id:
+            return
+        
+        # Temporarily enable the text widget
+        self.body_text.config(state=tk.NORMAL)
+        
+        # Refresh highlights
+        self.highlight_search_terms()
+        
+        # Disable again
+        self.body_text.config(state=tk.DISABLED)
     
     def load_images(self, topic_id):
         """Load and display images for the topic"""
