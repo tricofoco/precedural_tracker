@@ -4,14 +4,239 @@ A collaborative topic management tool with SQLite database backend.
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog, simpledialog
+from tkinter import ttk, messagebox, filedialog, simpledialog, font, colorchooser
 import sqlite3
 import os
+import json
 from datetime import datetime
-import pytz
 from pathlib import Path
 from PIL import Image, ImageTk
 import io
+import pytz
+
+class RichTextEditor(tk.Frame):
+    """Rich text editor with formatting toolbar"""
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent)
+        
+        # Create toolbar
+        toolbar = tk.Frame(self, bg="#f0f0f0", relief=tk.RAISED, bd=1)
+        toolbar.pack(side=tk.TOP, fill=tk.X, padx=2, pady=2)
+        
+        # Bold button
+        self.bold_btn = tk.Button(toolbar, text="B", font=("Arial", 10, "bold"),
+                                  width=3, command=self.toggle_bold)
+        self.bold_btn.pack(side=tk.LEFT, padx=2)
+        
+        # Italic button
+        self.italic_btn = tk.Button(toolbar, text="I", font=("Arial", 10, "italic"),
+                                    width=3, command=self.toggle_italic)
+        self.italic_btn.pack(side=tk.LEFT, padx=2)
+        
+        # Underline button
+        self.underline_btn = tk.Button(toolbar, text="U", font=("Arial", 10, "underline"),
+                                       width=3, command=self.toggle_underline)
+        self.underline_btn.pack(side=tk.LEFT, padx=2)
+        
+        # Separator
+        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
+        
+        # Font size
+        tk.Label(toolbar, text="Size:", bg="#f0f0f0").pack(side=tk.LEFT, padx=2)
+        self.size_var = tk.StringVar(value="11")
+        size_combo = ttk.Combobox(toolbar, textvariable=self.size_var, 
+                                  values=["8", "9", "10", "11", "12", "14", "16", "18", "20", "24"],
+                                  width=5, state="readonly")
+        size_combo.pack(side=tk.LEFT, padx=2)
+        size_combo.bind('<<ComboboxSelected>>', self.change_font_size)
+        
+        # Separator
+        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
+        
+        # Text color
+        self.color_btn = tk.Button(toolbar, text="Color", width=6, command=self.change_color)
+        self.color_btn.pack(side=tk.LEFT, padx=2)
+        
+        # Bullet point
+        self.bullet_btn = tk.Button(toolbar, text="• List", width=6, command=self.insert_bullet)
+        self.bullet_btn.pack(side=tk.LEFT, padx=2)
+        
+        # Separator
+        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
+        
+        # Clear formatting
+        self.clear_btn = tk.Button(toolbar, text="Clear Format", width=10, 
+                                   command=self.clear_formatting)
+        self.clear_btn.pack(side=tk.LEFT, padx=2)
+        
+        # Text widget with scrollbar
+        text_frame = tk.Frame(self)
+        text_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        
+        scrollbar = tk.Scrollbar(text_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        self.text = tk.Text(text_frame, wrap=tk.WORD, yscrollcommand=scrollbar.set,
+                           font=("Arial", 11), **kwargs)
+        self.text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=self.text.yview)
+        
+        # Configure tags for formatting
+        self.text.tag_configure("bold", font=("Arial", 11, "bold"))
+        self.text.tag_configure("italic", font=("Arial", 11, "italic"))
+        self.text.tag_configure("underline", font=("Arial", 11, "underline"))
+        self.text.tag_configure("bold_italic", font=("Arial", 11, "bold italic"))
+        self.text.tag_configure("bold_underline", font=("Arial", 11, "bold underline"))
+        self.text.tag_configure("italic_underline", font=("Arial", 11, "italic underline"))
+        self.text.tag_configure("bold_italic_underline", font=("Arial", 11, "bold italic underline"))
+        
+        # Bind keyboard shortcuts
+        self.text.bind('<Control-b>', lambda e: self.toggle_bold())
+        self.text.bind('<Control-i>', lambda e: self.toggle_italic())
+        self.text.bind('<Control-u>', lambda e: self.toggle_underline())
+        
+        # Track current formatting state
+        self.current_tags = set()
+    
+    def toggle_bold(self):
+        """Toggle bold formatting"""
+        try:
+            current_tags = self.text.tag_names("sel.first")
+            if "bold" in current_tags:
+                self.text.tag_remove("bold", "sel.first", "sel.last")
+            else:
+                self.text.tag_add("bold", "sel.first", "sel.last")
+        except tk.TclError:
+            pass
+    
+    def toggle_italic(self):
+        """Toggle italic formatting"""
+        try:
+            current_tags = self.text.tag_names("sel.first")
+            if "italic" in current_tags:
+                self.text.tag_remove("italic", "sel.first", "sel.last")
+            else:
+                self.text.tag_add("italic", "sel.first", "sel.last")
+        except tk.TclError:
+            pass
+    
+    def toggle_underline(self):
+        """Toggle underline formatting"""
+        try:
+            current_tags = self.text.tag_names("sel.first")
+            if "underline" in current_tags:
+                self.text.tag_remove("underline", "sel.first", "sel.last")
+            else:
+                self.text.tag_add("underline", "sel.first", "sel.last")
+        except tk.TclError:
+            pass
+    
+    def change_font_size(self, event=None):
+        """Change font size for selection"""
+        try:
+            size = int(self.size_var.get())
+            tag_name = f"size_{size}"
+            
+            # Configure the tag if it doesn't exist
+            if tag_name not in self.text.tag_names():
+                self.text.tag_configure(tag_name, font=("Arial", size))
+            
+            # Apply to selection
+            self.text.tag_add(tag_name, "sel.first", "sel.last")
+        except (tk.TclError, ValueError):
+            pass
+    
+    def change_color(self):
+        """Change text color for selection"""
+        color = colorchooser.askcolor(title="Choose text color")
+        if color[1]:  # color[1] is the hex color
+            try:
+                tag_name = f"color_{color[1]}"
+                if tag_name not in self.text.tag_names():
+                    self.text.tag_configure(tag_name, foreground=color[1])
+                self.text.tag_add(tag_name, "sel.first", "sel.last")
+            except tk.TclError:
+                pass
+    
+    def insert_bullet(self):
+        """Insert a bullet point"""
+        try:
+            self.text.insert(tk.INSERT, "• ")
+        except tk.TclError:
+            pass
+    
+    def clear_formatting(self):
+        """Clear all formatting from selection"""
+        try:
+            # Get all tags
+            for tag in self.text.tag_names():
+                if tag not in ("sel",):
+                    self.text.tag_remove(tag, "sel.first", "sel.last")
+        except tk.TclError:
+            pass
+    
+    def get_text(self):
+        """Get text content"""
+        return self.text.get(1.0, tk.END)
+    
+    def get_formatted_content(self):
+        """Get text content with formatting information"""
+        import json
+        
+        text = self.text.get(1.0, tk.END)
+        formatting = []
+        
+        # Get all tags and their ranges
+        for tag in self.text.tag_names():
+            if tag not in ("sel", ""):
+                ranges = self.text.tag_ranges(tag)
+                for i in range(0, len(ranges), 2):
+                    start = str(ranges[i])
+                    end = str(ranges[i+1])
+                    formatting.append({
+                        'tag': tag,
+                        'start': start,
+                        'end': end
+                    })
+        
+        return text, json.dumps(formatting)
+    
+    def set_text(self, text):
+        """Set text content"""
+        self.text.delete(1.0, tk.END)
+        self.text.insert(1.0, text)
+    
+    def set_formatted_content(self, text, formatting_json):
+        """Set text content with formatting information"""
+        import json
+        
+        self.text.delete(1.0, tk.END)
+        self.text.insert(1.0, text)
+        
+        if formatting_json:
+            try:
+                formatting = json.loads(formatting_json)
+                for fmt in formatting:
+                    tag = fmt['tag']
+                    start = fmt['start']
+                    end = fmt['end']
+                    
+                    # Recreate tag configuration if needed
+                    if tag.startswith('size_'):
+                        size = int(tag.split('_')[1])
+                        self.text.tag_configure(tag, font=("Arial", size))
+                    elif tag.startswith('color_'):
+                        color = tag.replace('color_', '')
+                        self.text.tag_configure(tag, foreground=color)
+                    
+                    self.text.tag_add(tag, start, end)
+            except (json.JSONDecodeError, KeyError, ValueError):
+                pass
+    
+    def get_text_widget(self):
+        """Get the underlying Text widget for advanced operations"""
+        return self.text
+
 
 class TopicManagerApp:
     def __init__(self, root, db_path):
@@ -31,7 +256,7 @@ class TopicManagerApp:
         
         # Load initial data
         self.refresh_topic_list()
-
+    
     def format_timestamp(self, timestamp_str):
         """Convert UTC timestamp to EST and format it"""
         if not timestamp_str:
@@ -62,12 +287,19 @@ class TopicManagerApp:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 body TEXT,
+                body_formatting TEXT,
                 created_by TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 modified_by TEXT,
                 modified_at TIMESTAMP
             )
         ''')
+        
+        # Check if body_formatting column exists (for existing databases)
+        cursor.execute("PRAGMA table_info(topics)")
+        columns = [column[1] for column in cursor.fetchall()]
+        if 'body_formatting' not in columns:
+            cursor.execute('ALTER TABLE topics ADD COLUMN body_formatting TEXT')
         
         # Images table
         cursor.execute('''
@@ -87,10 +319,10 @@ class TopicManagerApp:
             # Add sample topics
             sample_topics = [
                 ("Welcome to Topic Manager", 
-                 "This is a sample topic. You can edit or delete it, and add your own topics.\n\nFeatures:\n- Create and manage topics\n- Add images to topics\n- Search and filter topics\n- Track who created/edited each topic",
+                 "This is a sample topic. You can edit or delete it, and add your own topics.\n\nFeatures:\n- Create and manage topics\n- Add images to topics\n- Search and filter topics\n- Track who created/edited each topic\n- Rich text formatting (bold, italic, colors)",
                  "System"),
                 ("Getting Started",
-                 "To create a new topic, click the 'Add Topic' button.\n\nYou can:\n1. Add a title and description\n2. Upload images\n3. Edit existing topics\n4. Delete topics you no longer need\n\nAll changes are tracked with timestamps!",
+                 "To create a new topic, click the 'Add Topic' button.\n\nYou can:\n1. Add a title and description with rich text formatting\n2. Upload images\n3. Edit existing topics\n4. Delete topics you no longer need\n\nAll changes are tracked with timestamps!",
                  "System")
             ]
             
@@ -255,11 +487,13 @@ class TopicManagerApp:
     
     def load_topic_details(self, topic_id):
         """Load and display topic details"""
+        import json
+        
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
         cursor.execute('''
-            SELECT title, body, created_by, created_at, modified_by, modified_at 
+            SELECT title, body, body_formatting, created_by, created_at, modified_by, modified_at 
             FROM topics WHERE id = ?
         ''', (topic_id,))
         
@@ -268,7 +502,7 @@ class TopicManagerApp:
             conn.close()
             return
         
-        title, body, created_by, created_at, modified_by, modified_at = result
+        title, body, body_formatting, created_by, created_at, modified_by, modified_at = result
         
         # Update title
         self.title_label.config(text=title)
@@ -280,10 +514,39 @@ class TopicManagerApp:
             timestamp_text = f"Created by {created_by} on {self.format_timestamp(created_at)}"
         self.timestamp_label.config(text=timestamp_text)
         
-        # Update body
+        # Update body with formatting
         self.body_text.config(state=tk.NORMAL)
         self.body_text.delete(1.0, tk.END)
         self.body_text.insert(1.0, body or "")
+        
+        # Apply formatting if it exists
+        if body_formatting:
+            try:
+                formatting = json.loads(body_formatting)
+                for fmt in formatting:
+                    tag = fmt['tag']
+                    start = fmt['start']
+                    end = fmt['end']
+                    
+                    # Configure tag if needed
+                    if tag not in self.body_text.tag_names():
+                        if tag.startswith('size_'):
+                            size = int(tag.split('_')[1])
+                            self.body_text.tag_configure(tag, font=("Arial", size))
+                        elif tag.startswith('color_'):
+                            color = tag.replace('color_', '')
+                            self.body_text.tag_configure(tag, foreground=color)
+                        elif tag == "bold":
+                            self.body_text.tag_configure(tag, font=("Arial", 11, "bold"))
+                        elif tag == "italic":
+                            self.body_text.tag_configure(tag, font=("Arial", 11, "italic"))
+                        elif tag == "underline":
+                            self.body_text.tag_configure(tag, font=("Arial", 11, "underline"))
+                    
+                    self.body_text.tag_add(tag, start, end)
+            except (json.JSONDecodeError, KeyError, ValueError, IndexError):
+                pass
+        
         self.body_text.config(state=tk.DISABLED)
         
         # Load images
@@ -468,8 +731,8 @@ class AddTopicDialog:
         
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Add New Topic")
-        self.dialog.geometry("500x450")
-        self.dialog.minsize(400, 400)
+        self.dialog.geometry("600x500")
+        self.dialog.minsize(500, 450)
         self.dialog.transient(parent)
         self.dialog.grab_set()
         
@@ -483,20 +746,15 @@ class AddTopicDialog:
         self.title_entry = tk.Entry(self.dialog, font=("Arial", 10))
         self.title_entry.pack(fill=tk.X, padx=10, pady=5)
         
-        # Body
+        # Body with Rich Text Editor
         tk.Label(self.dialog, text="Topic Body:", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
         
-        text_frame = tk.Frame(self.dialog, height=180)
-        text_frame.pack(fill=tk.BOTH, padx=10, pady=5)
-        text_frame.pack_propagate(False)  # Prevent frame from shrinking
+        editor_frame = tk.Frame(self.dialog, height=250)
+        editor_frame.pack(fill=tk.BOTH, padx=10, pady=5)
+        editor_frame.pack_propagate(False)  # Prevent frame from shrinking
         
-        scrollbar = tk.Scrollbar(text_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        self.body_text = tk.Text(text_frame, wrap=tk.WORD, yscrollcommand=scrollbar.set, 
-                                font=("Arial", 10))
-        self.body_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.config(command=self.body_text.yview)
+        self.body_editor = RichTextEditor(editor_frame)
+        self.body_editor.pack(fill=tk.BOTH, expand=True)
         
         # Buttons
         btn_frame = tk.Frame(self.dialog)
@@ -513,7 +771,8 @@ class AddTopicDialog:
         """Create the new topic"""
         name = self.name_entry.get().strip()
         title = self.title_entry.get().strip()
-        body = self.body_text.get(1.0, tk.END).strip()
+        body, body_formatting = self.body_editor.get_formatted_content()
+        body = body.strip()
         
         if not name:
             messagebox.showwarning("Missing Information", "Please enter your name.")
@@ -527,8 +786,8 @@ class AddTopicDialog:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             cursor.execute(
-                'INSERT INTO topics (title, body, created_by) VALUES (?, ?, ?)',
-                (title, body, name)
+                'INSERT INTO topics (title, body, body_formatting, created_by) VALUES (?, ?, ?, ?)',
+                (title, body, body_formatting, name)
             )
             conn.commit()
             conn.close()
@@ -549,15 +808,15 @@ class EditTopicDialog:
         
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Edit Topic")
-        self.dialog.geometry("500x450")
-        self.dialog.minsize(400, 400)
+        self.dialog.geometry("600x500")
+        self.dialog.minsize(500, 450)
         self.dialog.transient(parent)
         self.dialog.grab_set()
         
         # Load existing data
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute('SELECT title, body FROM topics WHERE id = ?', (topic_id,))
+        cursor.execute('SELECT title, body, body_formatting FROM topics WHERE id = ?', (topic_id,))
         result = cursor.fetchone()
         conn.close()
         
@@ -565,7 +824,7 @@ class EditTopicDialog:
             self.dialog.destroy()
             return
         
-        existing_title, existing_body = result
+        existing_title, existing_body, existing_formatting = result
         
         # Your name
         tk.Label(self.dialog, text="Your Name:", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
@@ -578,21 +837,16 @@ class EditTopicDialog:
         self.title_entry.insert(0, existing_title)
         self.title_entry.pack(fill=tk.X, padx=10, pady=5)
         
-        # Body
+        # Body with Rich Text Editor
         tk.Label(self.dialog, text="Topic Body:", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
         
-        text_frame = tk.Frame(self.dialog, height=180)
-        text_frame.pack(fill=tk.BOTH, padx=10, pady=5)
-        text_frame.pack_propagate(False)  # Prevent frame from shrinking
+        editor_frame = tk.Frame(self.dialog, height=250)
+        editor_frame.pack(fill=tk.BOTH, padx=10, pady=5)
+        editor_frame.pack_propagate(False)  # Prevent frame from shrinking
         
-        scrollbar = tk.Scrollbar(text_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        self.body_text = tk.Text(text_frame, wrap=tk.WORD, yscrollcommand=scrollbar.set,
-                                font=("Arial", 10))
-        self.body_text.insert(1.0, existing_body or "")
-        self.body_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.config(command=self.body_text.yview)
+        self.body_editor = RichTextEditor(editor_frame)
+        self.body_editor.set_formatted_content(existing_body or "", existing_formatting)
+        self.body_editor.pack(fill=tk.BOTH, expand=True)
         
         # Buttons
         btn_frame = tk.Frame(self.dialog)
@@ -609,7 +863,8 @@ class EditTopicDialog:
         """Save the edited topic"""
         name = self.name_entry.get().strip()
         title = self.title_entry.get().strip()
-        body = self.body_text.get(1.0, tk.END).strip()
+        body, body_formatting = self.body_editor.get_formatted_content()
+        body = body.strip()
         
         if not name:
             messagebox.showwarning("Missing Information", "Please enter your name.")
@@ -624,9 +879,9 @@ class EditTopicDialog:
             cursor = conn.cursor()
             cursor.execute(
                 '''UPDATE topics 
-                   SET title = ?, body = ?, modified_by = ?, modified_at = CURRENT_TIMESTAMP 
+                   SET title = ?, body = ?, body_formatting = ?, modified_by = ?, modified_at = CURRENT_TIMESTAMP 
                    WHERE id = ?''',
-                (title, body, name, self.topic_id)
+                (title, body, body_formatting, name, self.topic_id)
             )
             conn.commit()
             conn.close()
@@ -642,7 +897,7 @@ def main():
     """Main entry point"""
     # Database path - should be on shared drive
     # For testing, use local path. Replace with your shared drive path
-    db_path = r"C:\Users\matti\Documents\topics.db"
+    db_path = os.path.join(os.path.dirname(__file__), "topics.db")
     
     # Uncomment and modify this for production on shared drive:
     # db_path = r"\\shared-drive\path\to\topics.db"
