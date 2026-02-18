@@ -1,8 +1,3 @@
-"""
-Topic Manager Application
-A collaborative topic management tool with SQLite database backend.
-"""
-
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog, font, colorchooser
 import sqlite3
@@ -242,10 +237,12 @@ class TopicManagerApp:
     def __init__(self, root, db_path):
         self.root = root
         self.root.title("Procedural Tracker")
-        self.root.geometry("1000x700")
+        self.root.geometry("1200x700")
         
         self.db_path = db_path
         self.current_topic_id = None
+        self.current_topic_name = None   # track selected topic title for subtopic filter
+        self.subtopics_data = []
         self.image_references = []  # Keep references to prevent garbage collection
         
         # Initialize database
@@ -286,6 +283,7 @@ class TopicManagerApp:
             CREATE TABLE IF NOT EXISTS topics (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
+                subtopic TEXT NOT NULL DEFAULT '',
                 body TEXT,
                 body_formatting TEXT,
                 created_by TEXT NOT NULL,
@@ -295,11 +293,13 @@ class TopicManagerApp:
             )
         ''')
         
-        # Check if body_formatting column exists (for existing databases)
+        # Check and add missing columns (for existing databases)
         cursor.execute("PRAGMA table_info(topics)")
         columns = [column[1] for column in cursor.fetchall()]
         if 'body_formatting' not in columns:
             cursor.execute('ALTER TABLE topics ADD COLUMN body_formatting TEXT')
+        if 'subtopic' not in columns:
+            cursor.execute("ALTER TABLE topics ADD COLUMN subtopic TEXT NOT NULL DEFAULT ''")
         
         # Images table
         cursor.execute('''
@@ -318,18 +318,20 @@ class TopicManagerApp:
         if cursor.fetchone()[0] == 0:
             # Add sample topics
             sample_topics = [
-                ("Welcome to Topic Manager", 
+                ("Welcome to Topic Manager",
+                 "Overview",
                  "This is a sample topic. You can edit or delete it, and add your own topics.\n\nFeatures:\n- Create and manage topics\n- Add images to topics\n- Search and filter topics\n- Track who created/edited each topic\n- Rich text formatting (bold, italic, colors)",
                  "System"),
                 ("Getting Started",
+                 "First Steps",
                  "To create a new topic, click the 'Add Topic' button.\n\nYou can:\n1. Add a title and description with rich text formatting\n2. Upload images\n3. Edit existing topics\n4. Delete topics you no longer need\n\nAll changes are tracked with timestamps!",
                  "System")
             ]
             
-            for title, body, creator in sample_topics:
+            for title, subtopic, body, creator in sample_topics:
                 cursor.execute(
-                    'INSERT INTO topics (title, body, created_by) VALUES (?, ?, ?)',
-                    (title, body, creator)
+                    'INSERT INTO topics (title, subtopic, body, created_by) VALUES (?, ?, ?, ?)',
+                    (title, subtopic, body, creator)
                 )
         
         conn.commit()
@@ -337,42 +339,72 @@ class TopicManagerApp:
     
     def create_widgets(self):
         """Create the main UI layout"""
-        # Main container with two panes
+        # Main container with three panes
         main_paned = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, sashrelief=tk.RAISED)
         main_paned.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # Left panel - Topic list
-        left_frame = tk.Frame(main_paned, width=300)
+
+        # ── Panel 1: Topics ──────────────────────────────────────────────
+        left_frame = tk.Frame(main_paned, width=220)
         main_paned.add(left_frame)
-        
+
+        tk.Label(left_frame, text="Topics", font=("Arial", 11, "bold")).pack(
+            padx=5, pady=(5, 0), anchor=tk.W)
+
         # Search bar
         search_frame = tk.Frame(left_frame)
         search_frame.pack(fill=tk.X, padx=5, pady=5)
-        
+
         tk.Label(search_frame, text="Search:").pack(side=tk.LEFT)
         self.search_var = tk.StringVar()
         self.search_var.trace('w', lambda *args: self.filter_topics())
         search_entry = tk.Entry(search_frame, textvariable=self.search_var)
         search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-        
+
         # Topic list
         list_frame = tk.Frame(left_frame)
         list_frame.pack(fill=tk.BOTH, expand=True, padx=5)
-        
+
         scrollbar = tk.Scrollbar(list_frame)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        self.topic_listbox = tk.Listbox(list_frame, yscrollcommand=scrollbar.set)
+
+        self.topic_listbox = tk.Listbox(list_frame, yscrollcommand=scrollbar.set,
+                                        exportselection=False)
         self.topic_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.topic_listbox.bind('<<ListboxSelect>>', self.on_topic_select)
         scrollbar.config(command=self.topic_listbox.yview)
-        
-        # Add Topic button
-        tk.Button(left_frame, text="Add Topic", command=self.add_topic, 
+
+        # Buttons
+        tk.Button(left_frame, text="Refresh", command=self.on_refresh,
+                 bg="#607D8B", fg="white", font=("Arial", 10, "bold")).pack(
+                     fill=tk.X, padx=5, pady=(5, 2))
+        tk.Button(left_frame, text="Add Topic", command=self.add_topic,
                  bg="#4CAF50", fg="white", font=("Arial", 10, "bold")).pack(
-                     fill=tk.X, padx=5, pady=5)
-        
-        # Right panel - Topic details
+                     fill=tk.X, padx=5, pady=(2, 5))
+
+        # ── Panel 2: Subtopics ───────────────────────────────────────────
+        mid_frame = tk.Frame(main_paned, width=220)
+        main_paned.add(mid_frame)
+
+        tk.Label(mid_frame, text="Subtopics", font=("Arial", 11, "bold")).pack(
+            padx=5, pady=(5, 0), anchor=tk.W)
+
+        self.subtopic_hint = tk.Label(mid_frame, text="← Select a topic",
+                                      font=("Arial", 9), fg="gray")
+        self.subtopic_hint.pack(padx=5, pady=(0, 2), anchor=tk.W)
+
+        sub_list_frame = tk.Frame(mid_frame)
+        sub_list_frame.pack(fill=tk.BOTH, expand=True, padx=5)
+
+        sub_scrollbar = tk.Scrollbar(sub_list_frame)
+        sub_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.subtopic_listbox = tk.Listbox(sub_list_frame, yscrollcommand=sub_scrollbar.set,
+                                            exportselection=False)
+        self.subtopic_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.subtopic_listbox.bind('<<ListboxSelect>>', self.on_subtopic_select)
+        sub_scrollbar.config(command=self.subtopic_listbox.yview)
+
+        # ── Panel 3: Content ─────────────────────────────────────────────
         right_frame = tk.Frame(main_paned)
         main_paned.add(right_frame)
         
@@ -448,46 +480,144 @@ class TopicManagerApp:
                               lambda e: self.images_canvas.configure(scrollregion=self.images_canvas.bbox('all')))
     
     def refresh_topic_list(self, search_term=""):
-        """Refresh the topic list from database"""
+        """Refresh the topic list from database (distinct topic titles)"""
         self.topic_listbox.delete(0, tk.END)
-        
+
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         if search_term:
             cursor.execute(
-                'SELECT id, title FROM topics WHERE title LIKE ? OR body LIKE ? ORDER BY id DESC',
-                (f'%{search_term}%', f'%{search_term}%')
+                '''SELECT DISTINCT title FROM topics 
+                   WHERE title LIKE ? OR body LIKE ? OR subtopic LIKE ?
+                   ORDER BY title ASC''',
+                (f'%{search_term}%', f'%{search_term}%', f'%{search_term}%')
             )
         else:
-            cursor.execute('SELECT id, title FROM topics ORDER BY id DESC')
-        
-        self.topics_data = cursor.fetchall()
+            cursor.execute('SELECT DISTINCT title FROM topics ORDER BY title ASC')
+
+        rows = cursor.fetchall()
         conn.close()
-        
-        for topic_id, title in self.topics_data:
+
+        self.topics_data = rows  # list of (title,)
+        for (title,) in rows:
             self.topic_listbox.insert(tk.END, title)
     
     def filter_topics(self):
         """Filter topics based on search term"""
         search_term = self.search_var.get()
         self.refresh_topic_list(search_term)
-        
-        # If a topic is currently selected, refresh its highlighting
-        if self.current_topic_id:
-            self.refresh_current_topic_highlighting()
+        # Clear subtopics and content when search changes
+        self.subtopic_listbox.delete(0, tk.END)
+        self.subtopic_hint.config(text="← Select a topic")
+        self.current_topic_id = None
+        self.current_topic_name = None
+        self.clear_topic_details()
+
+    def on_refresh(self):
+        """Manual refresh: reload topic list and refresh the currently selected topic."""
+        selected_title = self.current_topic_name
+        selected_id = self.current_topic_id
+        search_term = self.search_var.get() if hasattr(self, 'search_var') else ""
+
+        self.refresh_topic_list(search_term)
+
+        if selected_title is None:
+            if self.topic_listbox.size() == 0:
+                self.clear_topic_details()
+            return
+
+        # Reselect topic by title
+        index = None
+        for i, (title,) in enumerate(self.topics_data):
+            if title == selected_title:
+                index = i
+                break
+
+        if index is None:
+            self.current_topic_name = None
+            self.current_topic_id = None
+            self.subtopic_listbox.delete(0, tk.END)
+            self.subtopic_hint.config(text="← Select a topic")
+            self.clear_topic_details()
+            return
+
+        self.topic_listbox.selection_clear(0, tk.END)
+        self.topic_listbox.selection_set(index)
+        self.topic_listbox.see(index)
+        # Reload subtopics for this topic
+        self.load_subtopic_list(selected_title)
+
+        # Re-select the same subtopic if still present
+        if selected_id is not None:
+            for j in range(self.subtopic_listbox.size()):
+                sid = self.subtopics_data[j][0]
+                if sid == selected_id:
+                    self.subtopic_listbox.selection_set(j)
+                    self.subtopic_listbox.see(j)
+                    self.load_topic_details(selected_id)
+                    break
+
     
     def on_topic_select(self, event):
-        """Handle topic selection"""
+        """Handle topic selection — populate subtopic list"""
         selection = self.topic_listbox.curselection()
         if not selection:
             return
-        
+
         index = selection[0]
-        self.current_topic_id = self.topics_data[index][0]
-        self.load_topic_details(self.current_topic_id)
-        
-        # Enable buttons
+        title = self.topics_data[index][0]
+        self.current_topic_name = title
+
+        # Clear content panel until a subtopic is chosen
+        self.current_topic_id = None
+        self.clear_topic_details()
+        self.edit_btn.config(state=tk.DISABLED)
+        self.delete_btn.config(state=tk.DISABLED)
+        self.add_image_btn.config(state=tk.DISABLED)
+
+        self.load_subtopic_list(title)
+
+    def load_subtopic_list(self, topic_title):
+        """Load subtopics for the given topic title"""
+        self.subtopic_listbox.delete(0, tk.END)
+        search_term = self.search_var.get()
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        if search_term:
+            cursor.execute(
+                '''SELECT id, subtopic FROM topics 
+                   WHERE title = ? AND (subtopic LIKE ? OR body LIKE ?)
+                   ORDER BY subtopic ASC''',
+                (topic_title, f'%{search_term}%', f'%{search_term}%')
+            )
+        else:
+            cursor.execute(
+                'SELECT id, subtopic FROM topics WHERE title = ? ORDER BY subtopic ASC',
+                (topic_title,)
+            )
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        self.subtopics_data = rows  # list of (id, subtopic)
+        self.subtopic_hint.config(text=f"{len(rows)} subtopic(s)" if rows else "No subtopics")
+        for (_, subtopic) in rows:
+            self.subtopic_listbox.insert(tk.END, subtopic)
+
+    def on_subtopic_select(self, event):
+        """Handle subtopic selection — show content"""
+        selection = self.subtopic_listbox.curselection()
+        if not selection:
+            return
+
+        index = selection[0]
+        topic_id = self.subtopics_data[index][0]
+        self.current_topic_id = topic_id
+        self.load_topic_details(topic_id)
+
         self.edit_btn.config(state=tk.NORMAL)
         self.delete_btn.config(state=tk.NORMAL)
         self.add_image_btn.config(state=tk.NORMAL)
@@ -500,7 +630,7 @@ class TopicManagerApp:
         cursor = conn.cursor()
         
         cursor.execute('''
-            SELECT title, body, body_formatting, created_by, created_at, modified_by, modified_at 
+            SELECT title, subtopic, body, body_formatting, created_by, created_at, modified_by, modified_at 
             FROM topics WHERE id = ?
         ''', (topic_id,))
         
@@ -509,10 +639,11 @@ class TopicManagerApp:
             conn.close()
             return
         
-        title, body, body_formatting, created_by, created_at, modified_by, modified_at = result
+        title, subtopic, body, body_formatting, created_by, created_at, modified_by, modified_at = result
         
-        # Update title
-        self.title_label.config(text=title)
+        # Update title — show "Topic > Subtopic"
+        display_title = f"{title}  ›  {subtopic}" if subtopic else title
+        self.title_label.config(text=display_title)
         
         # Update timestamp
         if modified_at:
@@ -687,41 +818,78 @@ class TopicManagerApp:
         """Open dialog to add a new topic"""
         dialog = AddTopicDialog(self.root, self.db_path)
         self.root.wait_window(dialog.dialog)
-        
+
         if dialog.result:
             self.refresh_topic_list(self.search_var.get())
-            # Select the newly created topic
-            self.topic_listbox.selection_clear(0, tk.END)
-            self.topic_listbox.selection_set(0)
-            self.topic_listbox.event_generate('<<ListboxSelect>>')
+            # Select the newly created topic title
+            new_title = dialog.new_title
+            for i, (title,) in enumerate(self.topics_data):
+                if title == new_title:
+                    self.topic_listbox.selection_clear(0, tk.END)
+                    self.topic_listbox.selection_set(i)
+                    self.topic_listbox.see(i)
+                    self.on_topic_select(None)
+                    # Auto-select the subtopic too
+                    new_subtopic = dialog.new_subtopic
+                    for j, (sid, sub) in enumerate(self.subtopics_data):
+                        if sub == new_subtopic:
+                            self.subtopic_listbox.selection_set(j)
+                            self.on_subtopic_select(None)
+                            break
+                    break
     
     def edit_topic(self):
         """Open dialog to edit current topic"""
         if not self.current_topic_id:
             return
-        
+
         dialog = EditTopicDialog(self.root, self.db_path, self.current_topic_id)
         self.root.wait_window(dialog.dialog)
-        
+
         if dialog.result:
             self.refresh_topic_list(self.search_var.get())
-            self.load_topic_details(self.current_topic_id)
+            # Re-select topic and subtopic
+            new_title = dialog.new_title
+            new_subtopic = dialog.new_subtopic
+            for i, (title,) in enumerate(self.topics_data):
+                if title == new_title:
+                    self.topic_listbox.selection_clear(0, tk.END)
+                    self.topic_listbox.selection_set(i)
+                    self.topic_listbox.see(i)
+                    self.on_topic_select(None)
+                    for j, (sid, sub) in enumerate(self.subtopics_data):
+                        if sub == new_subtopic:
+                            self.subtopic_listbox.selection_set(j)
+                            self.on_subtopic_select(None)
+                            break
+                    break
     
     def delete_topic(self):
         """Delete the current topic"""
         if not self.current_topic_id:
             return
-        
-        if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this topic?"):
+
+        if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this subtopic?"):
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             cursor.execute('DELETE FROM topics WHERE id = ?', (self.current_topic_id,))
             cursor.execute('DELETE FROM images WHERE topic_id = ?', (self.current_topic_id,))
             conn.commit()
             conn.close()
-            
+
             self.current_topic_id = None
             self.refresh_topic_list(self.search_var.get())
+
+            # Reload subtopics if the parent topic still exists
+            if self.current_topic_name:
+                found = any(t == self.current_topic_name for (t,) in self.topics_data)
+                if found:
+                    self.load_subtopic_list(self.current_topic_name)
+                else:
+                    self.current_topic_name = None
+                    self.subtopic_listbox.delete(0, tk.END)
+                    self.subtopic_hint.config(text="← Select a topic")
+
             self.clear_topic_details()
     
     def add_image(self):
@@ -789,73 +957,93 @@ class AddTopicDialog:
     def __init__(self, parent, db_path):
         self.db_path = db_path
         self.result = False
-        
+        self.new_title = ""
+        self.new_subtopic = ""
+
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Add New Topic")
-        self.dialog.geometry("600x500")
-        self.dialog.minsize(500, 450)
+        self.dialog.geometry("600x560")
+        self.dialog.minsize(500, 500)
         self.dialog.transient(parent)
         self.dialog.grab_set()
-        
+
         # Your name
         tk.Label(self.dialog, text="Your Name:", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
         self.name_entry = tk.Entry(self.dialog, font=("Arial", 10))
         self.name_entry.pack(fill=tk.X, padx=10, pady=5)
-        
-        # Title
-        tk.Label(self.dialog, text="Topic Title:", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
-        self.title_entry = tk.Entry(self.dialog, font=("Arial", 10))
+
+        # Title — combobox: pick existing topic or type a new one
+        tk.Label(self.dialog, text="Title:*", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
+        try:
+            conn_t = sqlite3.connect(self.db_path)
+            cur_t = conn_t.cursor()
+            cur_t.execute('SELECT DISTINCT title FROM topics ORDER BY title ASC')
+            existing_titles = [row[0] for row in cur_t.fetchall()]
+            conn_t.close()
+        except Exception:
+            existing_titles = []
+        self.title_entry = ttk.Combobox(self.dialog, font=("Arial", 10), values=existing_titles)
         self.title_entry.pack(fill=tk.X, padx=10, pady=5)
-        
+
+        # Subtopic
+        tk.Label(self.dialog, text="Subtopic:*", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
+        self.subtopic_entry = tk.Entry(self.dialog, font=("Arial", 10))
+        self.subtopic_entry.pack(fill=tk.X, padx=10, pady=5)
+
         # Body with Rich Text Editor
-        tk.Label(self.dialog, text="Topic Body:", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
-        
+        tk.Label(self.dialog, text="Body:", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
+
         editor_frame = tk.Frame(self.dialog, height=250)
-        editor_frame.pack(fill=tk.BOTH, padx=10, pady=5)
-        editor_frame.pack_propagate(False)  # Prevent frame from shrinking
-        
+        editor_frame.pack(fill=tk.BOTH, padx=10, pady=5, expand=True)
+        editor_frame.pack_propagate(False)
+
         self.body_editor = RichTextEditor(editor_frame)
         self.body_editor.pack(fill=tk.BOTH, expand=True)
-        
+
         # Buttons
         btn_frame = tk.Frame(self.dialog)
         btn_frame.pack(fill=tk.X, padx=10, pady=10)
-        
+
         tk.Button(btn_frame, text="Create Topic", command=self.create_topic,
                  bg="#4CAF50", fg="white", font=("Arial", 10, "bold")).pack(side=tk.RIGHT, padx=5)
         tk.Button(btn_frame, text="Cancel", command=self.dialog.destroy,
                  font=("Arial", 10)).pack(side=tk.RIGHT)
-        
+
         self.name_entry.focus()
-    
+
     def create_topic(self):
         """Create the new topic"""
         name = self.name_entry.get().strip()
         title = self.title_entry.get().strip()
+        subtopic = self.subtopic_entry.get().strip()
         body, body_formatting = self.body_editor.get_formatted_content()
         body = body.strip()
-        
+
         if not name:
             messagebox.showwarning("Missing Information", "Please enter your name.")
             return
-        
         if not title:
             messagebox.showwarning("Missing Information", "Please enter a topic title.")
             return
-        
+        if not subtopic:
+            messagebox.showwarning("Missing Information", "Please enter a subtopic.")
+            return
+
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             cursor.execute(
-                'INSERT INTO topics (title, body, body_formatting, created_by) VALUES (?, ?, ?, ?)',
-                (title, body, body_formatting, name)
+                'INSERT INTO topics (title, subtopic, body, body_formatting, created_by) VALUES (?, ?, ?, ?, ?)',
+                (title, subtopic, body, body_formatting, name)
             )
             conn.commit()
             conn.close()
-            
+
+            self.new_title = title
+            self.new_subtopic = subtopic
             self.result = True
             self.dialog.destroy()
-            
+
         except Exception as e:
             messagebox.showerror("Error", f"Failed to create topic: {str(e)}")
 
@@ -866,90 +1054,143 @@ class EditTopicDialog:
         self.db_path = db_path
         self.topic_id = topic_id
         self.result = False
-        
+        self.new_title = ""
+        self.new_subtopic = ""
+
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Edit Topic")
-        self.dialog.geometry("600x500")
-        self.dialog.minsize(500, 450)
+        self.dialog.geometry("600x560")
+        self.dialog.minsize(500, 500)
         self.dialog.transient(parent)
         self.dialog.grab_set()
-        
+
         # Load existing data
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute('SELECT title, body, body_formatting FROM topics WHERE id = ?', (topic_id,))
+        cursor.execute(
+            'SELECT title, subtopic, body, body_formatting, modified_at FROM topics WHERE id = ?',
+            (topic_id,)
+        )
         result = cursor.fetchone()
         conn.close()
-        
+
         if not result:
             self.dialog.destroy()
             return
-        
-        existing_title, existing_body, existing_formatting = result
-        
+
+        existing_title, existing_subtopic, existing_body, existing_formatting, existing_modified_at = result
+        self.original_modified_at = existing_modified_at
+
         # Your name
         tk.Label(self.dialog, text="Your Name:", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
         self.name_entry = tk.Entry(self.dialog, font=("Arial", 10))
         self.name_entry.pack(fill=tk.X, padx=10, pady=5)
-        
+
         # Title
-        tk.Label(self.dialog, text="Topic Title:", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
+        tk.Label(self.dialog, text="Title:*", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
         self.title_entry = tk.Entry(self.dialog, font=("Arial", 10))
         self.title_entry.insert(0, existing_title)
         self.title_entry.pack(fill=tk.X, padx=10, pady=5)
-        
+
+        # Subtopic
+        tk.Label(self.dialog, text="Subtopic:*", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
+        self.subtopic_entry = tk.Entry(self.dialog, font=("Arial", 10))
+        self.subtopic_entry.insert(0, existing_subtopic or "")
+        self.subtopic_entry.pack(fill=tk.X, padx=10, pady=5)
+
         # Body with Rich Text Editor
-        tk.Label(self.dialog, text="Topic Body:", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
-        
+        tk.Label(self.dialog, text="Body:", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
+
         editor_frame = tk.Frame(self.dialog, height=250)
-        editor_frame.pack(fill=tk.BOTH, padx=10, pady=5)
-        editor_frame.pack_propagate(False)  # Prevent frame from shrinking
-        
+        editor_frame.pack(fill=tk.BOTH, padx=10, pady=5, expand=True)
+        editor_frame.pack_propagate(False)
+
         self.body_editor = RichTextEditor(editor_frame)
         self.body_editor.set_formatted_content(existing_body or "", existing_formatting)
         self.body_editor.pack(fill=tk.BOTH, expand=True)
-        
+
         # Buttons
         btn_frame = tk.Frame(self.dialog)
         btn_frame.pack(fill=tk.X, padx=10, pady=10)
-        
+
         tk.Button(btn_frame, text="Save Changes", command=self.save_changes,
                  bg="#2196F3", fg="white", font=("Arial", 10, "bold")).pack(side=tk.RIGHT, padx=5)
         tk.Button(btn_frame, text="Cancel", command=self.dialog.destroy,
                  font=("Arial", 10)).pack(side=tk.RIGHT)
-        
+
         self.name_entry.focus()
-    
+
     def save_changes(self):
-        """Save the edited topic"""
+        """Save the edited topic (with concurrency check)"""
         name = self.name_entry.get().strip()
         title = self.title_entry.get().strip()
+        subtopic = self.subtopic_entry.get().strip()
         body, body_formatting = self.body_editor.get_formatted_content()
         body = body.strip()
-        
+
         if not name:
             messagebox.showwarning("Missing Information", "Please enter your name.")
             return
-        
         if not title:
             messagebox.showwarning("Missing Information", "Please enter a topic title.")
             return
-        
+        if not subtopic:
+            messagebox.showwarning("Missing Information", "Please enter a subtopic.")
+            return
+
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
+
+            # Concurrency check
+            cursor.execute(
+                'SELECT title, subtopic, body, body_formatting, modified_at FROM topics WHERE id = ?',
+                (self.topic_id,)
+            )
+            row = cursor.fetchone()
+
+            if not row:
+                conn.close()
+                messagebox.showerror("Error", "This topic no longer exists (it may have been deleted).")
+                self.dialog.destroy()
+                return
+
+            db_title, db_subtopic, db_body, db_formatting, db_modified_at = row
+
+            if db_modified_at != getattr(self, 'original_modified_at', None):
+                conn.close()
+                reload_choice = messagebox.askyesno(
+                    "Topic updated by another user",
+                    "This topic was modified by another user since you opened it.\n\n"
+                    "Click Yes to reload the latest version (your current unsaved edits will be replaced).\n"
+                    "Click No to return to the editor."
+                )
+                if reload_choice:
+                    self.title_entry.delete(0, tk.END)
+                    self.title_entry.insert(0, db_title or "")
+                    self.subtopic_entry.delete(0, tk.END)
+                    self.subtopic_entry.insert(0, db_subtopic or "")
+                    self.body_editor.set_formatted_content(db_body or "", db_formatting or "")
+                    self.original_modified_at = db_modified_at
+                    messagebox.showinfo("Reloaded", "Reloaded the latest version. Please re-apply your changes and save again.")
+                return
+
+            # No conflict — save
             cursor.execute(
                 '''UPDATE topics 
-                   SET title = ?, body = ?, body_formatting = ?, modified_by = ?, modified_at = CURRENT_TIMESTAMP 
+                   SET title = ?, subtopic = ?, body = ?, body_formatting = ?,
+                       modified_by = ?, modified_at = CURRENT_TIMESTAMP 
                    WHERE id = ?''',
-                (title, body, body_formatting, name, self.topic_id)
+                (title, subtopic, body, body_formatting, name, self.topic_id)
             )
             conn.commit()
             conn.close()
-            
+
+            self.new_title = title
+            self.new_subtopic = subtopic
             self.result = True
             self.dialog.destroy()
-            
+
         except Exception as e:
             messagebox.showerror("Error", f"Failed to update topic: {str(e)}")
 
@@ -958,8 +1199,8 @@ def main():
     """Main entry point"""
     # Database path - should be on shared drive
     # For testing, use local path. Replace with your shared drive path
-    db_path = os.path.join(os.path.dirname(__file__), "topics.db")
-    
+    #db_path = r"G:\TSupport-Shared\mrizzostrian\procedures.db"
+    db_path = r"C:\Users\matti\Coding_local\BBG\knowledge_Space\topics.db"
     # Uncomment and modify this for production on shared drive:
     # db_path = r"\\shared-drive\path\to\topics.db"
     
