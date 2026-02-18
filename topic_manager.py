@@ -76,7 +76,7 @@ class RichTextEditor(tk.Frame):
         self.text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.text.yview)
         
-        # Configure tags for formatting
+        # Configure base tags (used for legacy data compatibility)
         self.text.tag_configure("bold", font=("Calibri", 11, "bold"))
         self.text.tag_configure("italic", font=("Calibri", 11, "italic"))
         self.text.tag_configure("underline", font=("Calibri", 11, "underline"))
@@ -84,60 +84,122 @@ class RichTextEditor(tk.Frame):
         self.text.tag_configure("bold_underline", font=("Calibri", 11, "bold underline"))
         self.text.tag_configure("italic_underline", font=("Calibri", 11, "italic underline"))
         self.text.tag_configure("bold_italic_underline", font=("Calibri", 11, "bold italic underline"))
-        
+
         # Bind keyboard shortcuts
         self.text.bind('<Control-b>', lambda e: self.toggle_bold())
         self.text.bind('<Control-i>', lambda e: self.toggle_italic())
         self.text.bind('<Control-u>', lambda e: self.toggle_underline())
-        
+
         # Track current formatting state
         self.current_tags = set()
+
+    # ── Combined-tag helpers ──────────────────────────────────────────────
+
+    def _font_tags(self):
+        """Return all font-related tags currently on the widget."""
+        result = []
+        style_tags = {"bold", "italic", "underline", "bold_italic",
+                      "bold_underline", "italic_underline", "bold_italic_underline"}
+        for tag in self.text.tag_names():
+            if tag in style_tags or tag.startswith("size_"):
+                result.append(tag)
+        return result
+
+    def _parse_style_from_tags(self, tags):
+        """Return (size, bold, italic, underline) decoded from a tag list."""
+        size = 11
+        bold = italic = underline = False
+        for tag in tags:
+            if tag == "bold":
+                bold = True
+            elif tag == "italic":
+                italic = True
+            elif tag == "underline":
+                underline = True
+            elif tag == "bold_italic":
+                bold = italic = True
+            elif tag == "bold_underline":
+                bold = underline = True
+            elif tag == "italic_underline":
+                italic = underline = True
+            elif tag == "bold_italic_underline":
+                bold = italic = underline = True
+            elif tag.startswith("size_"):
+                parts = tag.split("_")
+                try:
+                    size = int(parts[1])
+                except (IndexError, ValueError):
+                    pass
+                for p in parts[2:]:
+                    if p == "bold":      bold = True
+                    elif p == "italic":  italic = True
+                    elif p == "underline": underline = True
+        return size, bold, italic, underline
+
+    def _make_combined_tag(self, size, bold, italic, underline):
+        """Return (and configure) the canonical tag name for a style combo."""
+        styles = []
+        if bold:      styles.append("bold")
+        if italic:    styles.append("italic")
+        if underline: styles.append("underline")
+
+        if size != 11:
+            tag_name = ("size_" + str(size) + ("_" + "_".join(styles) if styles else ""))
+        elif styles:
+            tag_name = "_".join(styles)
+        else:
+            return None  # plain default — no tag needed
+
+        style_str = " ".join(styles)
+        font_spec = ("Calibri", size, style_str) if style_str else ("Calibri", size)
+        self.text.tag_configure(tag_name, font=font_spec)
+        return tag_name
+
+    def _apply_combined_style(self, size, bold, italic, underline):
+        """Remove all font tags from the selection, then apply one combined tag."""
+        try:
+            for tag in self._font_tags():
+                self.text.tag_remove(tag, "sel.first", "sel.last")
+            tag_name = self._make_combined_tag(size, bold, italic, underline)
+            if tag_name:
+                self.text.tag_add(tag_name, "sel.first", "sel.last")
+        except tk.TclError:
+            pass
     
     def toggle_bold(self):
         """Toggle bold formatting"""
         try:
-            current_tags = self.text.tag_names("sel.first")
-            if "bold" in current_tags:
-                self.text.tag_remove("bold", "sel.first", "sel.last")
-            else:
-                self.text.tag_add("bold", "sel.first", "sel.last")
+            tags = self.text.tag_names("sel.first")
+            size, bold, italic, underline = self._parse_style_from_tags(tags)
+            self._apply_combined_style(size, not bold, italic, underline)
         except tk.TclError:
             pass
-    
+
     def toggle_italic(self):
         """Toggle italic formatting"""
         try:
-            current_tags = self.text.tag_names("sel.first")
-            if "italic" in current_tags:
-                self.text.tag_remove("italic", "sel.first", "sel.last")
-            else:
-                self.text.tag_add("italic", "sel.first", "sel.last")
+            tags = self.text.tag_names("sel.first")
+            size, bold, italic, underline = self._parse_style_from_tags(tags)
+            self._apply_combined_style(size, bold, not italic, underline)
         except tk.TclError:
             pass
-    
+
     def toggle_underline(self):
         """Toggle underline formatting"""
         try:
-            current_tags = self.text.tag_names("sel.first")
-            if "underline" in current_tags:
-                self.text.tag_remove("underline", "sel.first", "sel.last")
-            else:
-                self.text.tag_add("underline", "sel.first", "sel.last")
+            tags = self.text.tag_names("sel.first")
+            size, bold, italic, underline = self._parse_style_from_tags(tags)
+            self._apply_combined_style(size, bold, italic, not underline)
         except tk.TclError:
             pass
-    
+
     def change_font_size(self, event=None):
         """Change font size for selection"""
         try:
             size = int(self.size_var.get())
-            tag_name = f"size_{size}"
-            
-            # Configure the tag if it doesn't exist
-            if tag_name not in self.text.tag_names():
-                self.text.tag_configure(tag_name, font=("Calibri", size))
-            
-            # Apply to selection
-            self.text.tag_add(tag_name, "sel.first", "sel.last")
+            tags = self.text.tag_names("sel.first")
+            _, bold, italic, underline = self._parse_style_from_tags(tags)
+            self._apply_combined_style(size, bold, italic, underline)
         except (tk.TclError, ValueError):
             pass
     
@@ -163,9 +225,11 @@ class RichTextEditor(tk.Frame):
     def clear_formatting(self):
         """Clear all formatting from selection"""
         try:
-            # Get all tags
+            for tag in self._font_tags():
+                self.text.tag_remove(tag, "sel.first", "sel.last")
+            # Also clear color tags
             for tag in self.text.tag_names():
-                if tag not in ("sel",):
+                if tag.startswith("color_"):
                     self.text.tag_remove(tag, "sel.first", "sel.last")
         except tk.TclError:
             pass
@@ -215,15 +279,25 @@ class RichTextEditor(tk.Frame):
                     tag = fmt['tag']
                     start = fmt['start']
                     end = fmt['end']
-                    
+
                     # Recreate tag configuration if needed
                     if tag.startswith('size_'):
-                        size = int(tag.split('_')[1])
-                        self.text.tag_configure(tag, font=("Calibri", size))
+                        parts = tag.split('_')
+                        size = int(parts[1])
+                        bold = 'bold' in parts[2:]
+                        italic = 'italic' in parts[2:]
+                        underline = 'underline' in parts[2:]
+                        styles = " ".join(filter(None, [
+                            "bold" if bold else "",
+                            "italic" if italic else "",
+                            "underline" if underline else ""
+                        ]))
+                        font_spec = ("Calibri", size, styles) if styles else ("Calibri", size)
+                        self.text.tag_configure(tag, font=font_spec)
                     elif tag.startswith('color_'):
                         color = tag.replace('color_', '')
                         self.text.tag_configure(tag, foreground=color)
-                    
+
                     self.text.tag_add(tag, start, end)
             except (json.JSONDecodeError, KeyError, ValueError):
                 pass
@@ -463,8 +537,8 @@ class TopicManagerApp:
         self.add_image_btn.pack(side=tk.RIGHT)
         
         # Images container with scrollbar
-        images_container = tk.Frame(right_frame)
-        images_container.pack(fill=tk.BOTH, padx=10, pady=5)
+        self.images_container = tk.Frame(right_frame)
+        images_container = self.images_container
         
         images_scrollbar = tk.Scrollbar(images_container, orient=tk.HORIZONTAL)
         images_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
@@ -577,6 +651,12 @@ class TopicManagerApp:
         self.add_image_btn.config(state=tk.DISABLED)
 
         self.load_subtopic_list(title)
+
+        # Auto-select the first subtopic if any exist
+        if self.subtopics_data:
+            self.subtopic_listbox.selection_set(0)
+            self.subtopic_listbox.see(0)
+            self.on_subtopic_select(None)
 
     def load_subtopic_list(self, topic_title):
         """Load subtopics for the given topic title"""
@@ -752,16 +832,20 @@ class TopicManagerApp:
         for widget in self.images_frame.winfo_children():
             widget.destroy()
         self.image_references.clear()
-        
+
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         cursor.execute('SELECT id, image_data, filename FROM images WHERE topic_id = ?', (topic_id,))
         images = cursor.fetchall()
         conn.close()
-        
-        for idx, (image_id, image_data, filename) in enumerate(images):
-            self.create_image_thumbnail(image_id, image_data, filename, idx)
+
+        if images:
+            self.images_container.pack(fill=tk.BOTH, padx=10, pady=5)
+            for idx, (image_id, image_data, filename) in enumerate(images):
+                self.create_image_thumbnail(image_id, image_data, filename, idx)
+        else:
+            self.images_container.pack_forget()
     
     def create_image_thumbnail(self, image_id, image_data, filename, position):
         """Create an image thumbnail with delete button"""
@@ -946,7 +1030,8 @@ class TopicManagerApp:
         for widget in self.images_frame.winfo_children():
             widget.destroy()
         self.image_references.clear()
-        
+        self.images_container.pack_forget()
+
         self.edit_btn.config(state=tk.DISABLED)
         self.delete_btn.config(state=tk.DISABLED)
         self.add_image_btn.config(state=tk.DISABLED)
