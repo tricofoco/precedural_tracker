@@ -19,17 +19,17 @@ class RichTextEditor(tk.Frame):
         toolbar.pack(side=tk.TOP, fill=tk.X, padx=2, pady=2)
         
         # Bold button
-        self.bold_btn = tk.Button(toolbar, text="B", font=("Arial", 10, "bold"),
+        self.bold_btn = tk.Button(toolbar, text="B", font=("Calibri", 10, "bold"),
                                   width=3, command=self.toggle_bold)
         self.bold_btn.pack(side=tk.LEFT, padx=2)
         
         # Italic button
-        self.italic_btn = tk.Button(toolbar, text="I", font=("Arial", 10, "italic"),
+        self.italic_btn = tk.Button(toolbar, text="I", font=("Calibri", 10, "italic"),
                                     width=3, command=self.toggle_italic)
         self.italic_btn.pack(side=tk.LEFT, padx=2)
         
         # Underline button
-        self.underline_btn = tk.Button(toolbar, text="U", font=("Arial", 10, "underline"),
+        self.underline_btn = tk.Button(toolbar, text="U", font=("Calibri", 10, "underline"),
                                        width=3, command=self.toggle_underline)
         self.underline_btn.pack(side=tk.LEFT, padx=2)
         
@@ -72,18 +72,18 @@ class RichTextEditor(tk.Frame):
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
         self.text = tk.Text(text_frame, wrap=tk.WORD, yscrollcommand=scrollbar.set,
-                           font=("Arial", 11), **kwargs)
+                           font=("Calibri", 11), **kwargs)
         self.text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.text.yview)
         
         # Configure tags for formatting
-        self.text.tag_configure("bold", font=("Arial", 11, "bold"))
-        self.text.tag_configure("italic", font=("Arial", 11, "italic"))
-        self.text.tag_configure("underline", font=("Arial", 11, "underline"))
-        self.text.tag_configure("bold_italic", font=("Arial", 11, "bold italic"))
-        self.text.tag_configure("bold_underline", font=("Arial", 11, "bold underline"))
-        self.text.tag_configure("italic_underline", font=("Arial", 11, "italic underline"))
-        self.text.tag_configure("bold_italic_underline", font=("Arial", 11, "bold italic underline"))
+        self.text.tag_configure("bold", font=("Calibri", 11, "bold"))
+        self.text.tag_configure("italic", font=("Calibri", 11, "italic"))
+        self.text.tag_configure("underline", font=("Calibri", 11, "underline"))
+        self.text.tag_configure("bold_italic", font=("Calibri", 11, "bold italic"))
+        self.text.tag_configure("bold_underline", font=("Calibri", 11, "bold underline"))
+        self.text.tag_configure("italic_underline", font=("Calibri", 11, "italic underline"))
+        self.text.tag_configure("bold_italic_underline", font=("Calibri", 11, "bold italic underline"))
         
         # Bind keyboard shortcuts
         self.text.bind('<Control-b>', lambda e: self.toggle_bold())
@@ -134,7 +134,7 @@ class RichTextEditor(tk.Frame):
             
             # Configure the tag if it doesn't exist
             if tag_name not in self.text.tag_names():
-                self.text.tag_configure(tag_name, font=("Arial", size))
+                self.text.tag_configure(tag_name, font=("Calibri", size))
             
             # Apply to selection
             self.text.tag_add(tag_name, "sel.first", "sel.last")
@@ -219,7 +219,7 @@ class RichTextEditor(tk.Frame):
                     # Recreate tag configuration if needed
                     if tag.startswith('size_'):
                         size = int(tag.split('_')[1])
-                        self.text.tag_configure(tag, font=("Arial", size))
+                        self.text.tag_configure(tag, font=("Calibri", size))
                     elif tag.startswith('color_'):
                         color = tag.replace('color_', '')
                         self.text.tag_configure(tag, foreground=color)
@@ -347,7 +347,7 @@ class TopicManagerApp:
         left_frame = tk.Frame(main_paned, width=220)
         main_paned.add(left_frame)
 
-        tk.Label(left_frame, text="Topics", font=("Arial", 11, "bold")).pack(
+        tk.Label(left_frame, text="Topics", font=("Calibri", 11, "bold")).pack(
             padx=5, pady=(5, 0), anchor=tk.W)
 
         # Search bar
@@ -375,21 +375,21 @@ class TopicManagerApp:
 
         # Buttons
         tk.Button(left_frame, text="Refresh", command=self.on_refresh,
-                 bg="#607D8B", fg="white", font=("Arial", 10, "bold")).pack(
+                 bg="#607D8B", fg="white", font=("Calibri", 10, "bold")).pack(
                      fill=tk.X, padx=5, pady=(5, 2))
         tk.Button(left_frame, text="Add New", command=self.add_topic,
-                 bg="#4CAF50", fg="white", font=("Arial", 10, "bold")).pack(
+                 bg="#4CAF50", fg="white", font=("Calibri", 10, "bold")).pack(
                      fill=tk.X, padx=5, pady=(2, 5))
 
         # ── Panel 2: Subtopics ───────────────────────────────────────────
         mid_frame = tk.Frame(main_paned, width=220)
         main_paned.add(mid_frame)
 
-        tk.Label(mid_frame, text="Subtopics", font=("Arial", 11, "bold")).pack(
+        tk.Label(mid_frame, text="Subtopics", font=("Calibri", 11, "bold")).pack(
             padx=5, pady=(5, 0), anchor=tk.W)
 
         self.subtopic_hint = tk.Label(mid_frame, text="← Select a topic",
-                                      font=("Arial", 9), fg="gray")
+                                      font=("Calibri", 9), fg="gray")
         self.subtopic_hint.pack(padx=5, pady=(0, 2), anchor=tk.W)
 
         sub_list_frame = tk.Frame(mid_frame)
@@ -413,7 +413,7 @@ class TopicManagerApp:
         title_frame.pack(fill=tk.X, padx=10, pady=5)
         
         self.title_label = tk.Label(title_frame, text="Select a topic", 
-                                    font=("Arial", 16, "bold"), anchor=tk.W)
+                                    font=("Calibri", 16, "bold"), anchor=tk.W)
         self.title_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
         # Button frame
@@ -429,7 +429,7 @@ class TopicManagerApp:
         self.delete_btn.pack(side=tk.LEFT, padx=2)
         
         # Timestamp label
-        self.timestamp_label = tk.Label(right_frame, text="", font=("Arial", 9), 
+        self.timestamp_label = tk.Label(right_frame, text="", font=("Calibri", 9), 
                                        fg="gray", anchor=tk.W)
         self.timestamp_label.pack(fill=tk.X, padx=10)
         
@@ -444,7 +444,7 @@ class TopicManagerApp:
         body_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
         self.body_text = tk.Text(body_frame, wrap=tk.WORD, yscrollcommand=body_scrollbar.set,
-                                font=("Arial", 11), state=tk.DISABLED)
+                                font=("Calibri", 11), state=tk.DISABLED)
         self.body_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         body_scrollbar.config(command=self.body_text.yview)
         
@@ -455,7 +455,7 @@ class TopicManagerApp:
         images_label_frame = tk.Frame(right_frame)
         images_label_frame.pack(fill=tk.X, padx=10, pady=(10, 0))
         
-        tk.Label(images_label_frame, text="Images", font=("Arial", 12, "bold")).pack(side=tk.LEFT)
+        tk.Label(images_label_frame, text="Images", font=("Calibri", 12, "bold")).pack(side=tk.LEFT)
         
         self.add_image_btn = tk.Button(images_label_frame, text="Add Image", 
                                        command=self.add_image, state=tk.DISABLED,
@@ -670,16 +670,16 @@ class TopicManagerApp:
                     if tag not in self.body_text.tag_names():
                         if tag.startswith('size_'):
                             size = int(tag.split('_')[1])
-                            self.body_text.tag_configure(tag, font=("Arial", size))
+                            self.body_text.tag_configure(tag, font=("Calibri", size))
                         elif tag.startswith('color_'):
                             color = tag.replace('color_', '')
                             self.body_text.tag_configure(tag, foreground=color)
                         elif tag == "bold":
-                            self.body_text.tag_configure(tag, font=("Arial", 11, "bold"))
+                            self.body_text.tag_configure(tag, font=("Calibri", 11, "bold"))
                         elif tag == "italic":
-                            self.body_text.tag_configure(tag, font=("Arial", 11, "italic"))
+                            self.body_text.tag_configure(tag, font=("Calibri", 11, "italic"))
                         elif tag == "underline":
-                            self.body_text.tag_configure(tag, font=("Arial", 11, "underline"))
+                            self.body_text.tag_configure(tag, font=("Calibri", 11, "underline"))
                     
                     self.body_text.tag_add(tag, start, end)
             except (json.JSONDecodeError, KeyError, ValueError, IndexError):
@@ -785,12 +785,12 @@ class TopicManagerApp:
             # Filename label
             if filename:
                 name_label = tk.Label(frame, text=filename[:12] + "..." if len(filename) > 12 else filename,
-                                     font=("Arial", 8), wraplength=100)
+                                     font=("Calibri", 8), wraplength=100)
                 name_label.pack(pady=(0, 3))
             
             # Delete button
             delete_btn = tk.Button(frame, text="Delete", command=lambda: self.delete_image(image_id),
-                                  bg="#f44336", fg="white", font=("Arial", 8, "bold"))
+                                  bg="#f44336", fg="white", font=("Calibri", 8, "bold"))
             delete_btn.pack(fill=tk.X)
             
         except Exception as e:
@@ -968,12 +968,12 @@ class AddTopicDialog:
         self.dialog.grab_set()
 
         # Your name
-        tk.Label(self.dialog, text="Your Name:", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
-        self.name_entry = tk.Entry(self.dialog, font=("Arial", 10))
+        tk.Label(self.dialog, text="Your Name:", font=("Calibri", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
+        self.name_entry = tk.Entry(self.dialog, font=("Calibri", 10))
         self.name_entry.pack(fill=tk.X, padx=10, pady=5)
 
         # Title — combobox: pick existing topic or type a new one
-        tk.Label(self.dialog, text="Title (enter new or select exisiting):", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
+        tk.Label(self.dialog, text="Title (enter new or select exisiting):", font=("Calibri", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
         try:
             conn_t = sqlite3.connect(self.db_path)
             cur_t = conn_t.cursor()
@@ -982,16 +982,16 @@ class AddTopicDialog:
             conn_t.close()
         except Exception:
             existing_titles = []
-        self.title_entry = ttk.Combobox(self.dialog, font=("Arial", 10), values=existing_titles)
+        self.title_entry = ttk.Combobox(self.dialog, font=("Calibri", 10), values=existing_titles)
         self.title_entry.pack(fill=tk.X, padx=10, pady=5)
 
         # Subtopic
-        tk.Label(self.dialog, text="Subtopic:", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
-        self.subtopic_entry = tk.Entry(self.dialog, font=("Arial", 10))
+        tk.Label(self.dialog, text="Subtopic:", font=("Calibri", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
+        self.subtopic_entry = tk.Entry(self.dialog, font=("Calibri", 10))
         self.subtopic_entry.pack(fill=tk.X, padx=10, pady=5)
 
         # Body with Rich Text Editor
-        tk.Label(self.dialog, text="Body:", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
+        tk.Label(self.dialog, text="Body:", font=("Calibri", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
 
         editor_frame = tk.Frame(self.dialog, height=250)
         editor_frame.pack(fill=tk.BOTH, padx=10, pady=5, expand=True)
@@ -1005,9 +1005,9 @@ class AddTopicDialog:
         btn_frame.pack(fill=tk.X, padx=10, pady=10)
 
         tk.Button(btn_frame, text="Create", command=self.create_topic,
-                 bg="#4CAF50", fg="white", font=("Arial", 10, "bold")).pack(side=tk.RIGHT, padx=5)
+                 bg="#4CAF50", fg="white", font=("Calibri", 10, "bold")).pack(side=tk.RIGHT, padx=5)
         tk.Button(btn_frame, text="Cancel", command=self.dialog.destroy,
-                 font=("Arial", 10)).pack(side=tk.RIGHT)
+                 font=("Calibri", 10)).pack(side=tk.RIGHT)
 
         self.name_entry.focus()
 
@@ -1082,24 +1082,24 @@ class EditTopicDialog:
         self.original_modified_at = existing_modified_at
 
         # Your name
-        tk.Label(self.dialog, text="Your Name:", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
-        self.name_entry = tk.Entry(self.dialog, font=("Arial", 10))
+        tk.Label(self.dialog, text="Your Name:", font=("Calibri", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
+        self.name_entry = tk.Entry(self.dialog, font=("Calibri", 10))
         self.name_entry.pack(fill=tk.X, padx=10, pady=5)
 
         # Title
-        tk.Label(self.dialog, text="Title:*", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
-        self.title_entry = tk.Entry(self.dialog, font=("Arial", 10))
+        tk.Label(self.dialog, text="Title:*", font=("Calibri", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
+        self.title_entry = tk.Entry(self.dialog, font=("Calibri", 10))
         self.title_entry.insert(0, existing_title)
         self.title_entry.pack(fill=tk.X, padx=10, pady=5)
 
         # Subtopic
-        tk.Label(self.dialog, text="Subtopic:*", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
-        self.subtopic_entry = tk.Entry(self.dialog, font=("Arial", 10))
+        tk.Label(self.dialog, text="Subtopic:*", font=("Calibri", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
+        self.subtopic_entry = tk.Entry(self.dialog, font=("Calibri", 10))
         self.subtopic_entry.insert(0, existing_subtopic or "")
         self.subtopic_entry.pack(fill=tk.X, padx=10, pady=5)
 
         # Body with Rich Text Editor
-        tk.Label(self.dialog, text="Body:", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
+        tk.Label(self.dialog, text="Body:", font=("Calibri", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
 
         editor_frame = tk.Frame(self.dialog, height=250)
         editor_frame.pack(fill=tk.BOTH, padx=10, pady=5, expand=True)
@@ -1114,9 +1114,9 @@ class EditTopicDialog:
         btn_frame.pack(fill=tk.X, padx=10, pady=10)
 
         tk.Button(btn_frame, text="Save Changes", command=self.save_changes,
-                 bg="#2196F3", fg="white", font=("Arial", 10, "bold")).pack(side=tk.RIGHT, padx=5)
+                 bg="#2196F3", fg="white", font=("Calibri", 10, "bold")).pack(side=tk.RIGHT, padx=5)
         tk.Button(btn_frame, text="Cancel", command=self.dialog.destroy,
-                 font=("Arial", 10)).pack(side=tk.RIGHT)
+                 font=("Calibri", 10)).pack(side=tk.RIGHT)
 
         self.name_entry.focus()
 
