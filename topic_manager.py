@@ -377,7 +377,7 @@ class TopicManagerApp:
         tk.Button(left_frame, text="Refresh", command=self.on_refresh,
                  bg="#607D8B", fg="white", font=("Arial", 10, "bold")).pack(
                      fill=tk.X, padx=5, pady=(5, 2))
-        tk.Button(left_frame, text="Add Topic", command=self.add_topic,
+        tk.Button(left_frame, text="Add New", command=self.add_topic,
                  bg="#4CAF50", fg="white", font=("Arial", 10, "bold")).pack(
                      fill=tk.X, padx=5, pady=(2, 5))
 
@@ -420,11 +420,11 @@ class TopicManagerApp:
         btn_frame = tk.Frame(title_frame)
         btn_frame.pack(side=tk.RIGHT)
         
-        self.edit_btn = tk.Button(btn_frame, text="Edit Topic", command=self.edit_topic,
+        self.edit_btn = tk.Button(btn_frame, text="Edit", command=self.edit_topic,
                                   state=tk.DISABLED, bg="#2196F3", fg="white")
         self.edit_btn.pack(side=tk.LEFT, padx=2)
         
-        self.delete_btn = tk.Button(btn_frame, text="Delete Topic", command=self.delete_topic,
+        self.delete_btn = tk.Button(btn_frame, text="Delete", command=self.delete_topic,
                                     state=tk.DISABLED, bg="#f44336", fg="white")
         self.delete_btn.pack(side=tk.LEFT, padx=2)
         
@@ -973,7 +973,7 @@ class AddTopicDialog:
         self.name_entry.pack(fill=tk.X, padx=10, pady=5)
 
         # Title — combobox: pick existing topic or type a new one
-        tk.Label(self.dialog, text="Title:*", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
+        tk.Label(self.dialog, text="Title (enter new or select exisiting):", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
         try:
             conn_t = sqlite3.connect(self.db_path)
             cur_t = conn_t.cursor()
@@ -986,7 +986,7 @@ class AddTopicDialog:
         self.title_entry.pack(fill=tk.X, padx=10, pady=5)
 
         # Subtopic
-        tk.Label(self.dialog, text="Subtopic:*", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
+        tk.Label(self.dialog, text="Subtopic:", font=("Arial", 10)).pack(pady=(10, 0), padx=10, anchor=tk.W)
         self.subtopic_entry = tk.Entry(self.dialog, font=("Arial", 10))
         self.subtopic_entry.pack(fill=tk.X, padx=10, pady=5)
 
@@ -1004,7 +1004,7 @@ class AddTopicDialog:
         btn_frame = tk.Frame(self.dialog)
         btn_frame.pack(fill=tk.X, padx=10, pady=10)
 
-        tk.Button(btn_frame, text="Create Topic", command=self.create_topic,
+        tk.Button(btn_frame, text="Create", command=self.create_topic,
                  bg="#4CAF50", fg="white", font=("Arial", 10, "bold")).pack(side=tk.RIGHT, padx=5)
         tk.Button(btn_frame, text="Cancel", command=self.dialog.destroy,
                  font=("Arial", 10)).pack(side=tk.RIGHT)
